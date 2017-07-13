@@ -1,0 +1,65 @@
+version: '2'
+services:
+  wordpress:
+    build: .
+    links:
+      - db
+    ports:
+      - ${SITE_PORT}:80
+      - ${SITE_SSL_PORT}:443
+    volumes:
+      - ./data:/data
+      - ./app:/app/wp-content
+      - ./config/php.ini:/etc/php5/apache2/php.ini:ro
+
+    environment:
+      DB_NAME: ${DB_NAME}
+      DB_PASS: root
+      DB_PREFIX: ${DB_PREFIX}
+      SERVER_MODE: ${SERVER_MODE}
+      RESTORE: ${RESTORE}
+      PLUGINS: >-
+        woocommerce,
+      SEARCH_REPLACE: ${BEFORE_SITE_URL},${SITE_URL}
+    networks:
+      - wd_network
+  db:
+    image: mysql:5.7 # or mariadb
+    ports:
+      - ${DB_PORT}:3306
+    volumes:
+      - data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    networks:
+      - wd_network
+  scrapinhub:
+    image: sbdev/wd-wordpress:ws-1.2
+    links:
+      - wordpress
+    volumes:
+      - .:/wd-wordpress
+    command:
+      tail -f /dev/null
+    networks:
+      - wd_network
+  phpmyadmin:
+      image:
+        phpmyadmin/phpmyadmin:latest
+      networks:
+        - wd_network
+      links:
+        - db:pma_db
+      ports:
+        - "${PHP_MYADMIN_PORT}:80"
+volumes:
+  data: {}
+
+networks:
+    wd_network:
+      driver:
+        bridge
+      ipam:
+        config:
+        - subnet: 172.25.0.0/24
+          gateway: 172.25.0.1

@@ -1,0 +1,78 @@
+# https://discuss.circleci.com/t/build-on-tag/9864/42
+# NOTE: a workaround that make circle-ci 2.0 support $CIRCLE_TAG environment variable
+deployment:
+  fake_deploy_for_production:
+    tag: /.*/
+    commands:
+      - echo "make tags run in 2.0"
+
+version: 2
+jobs:
+  build:
+    working_directory: ~/kid-guard-backend
+    docker:
+      - image: node:6.2.2
+        cmd: ["/bin/bash"]
+      - image: redis:3.0
+      - image: levlaz/elasticsearch-docker-ci:5.1.1
+
+    steps:
+      - run:
+          name: Install System Libs
+          command: |
+            apt-key adv --fetch-keys http://dl.yarnpkg.com/debian/pubkey.gpg
+            echo "deb http://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+            apt -qq update
+            apt install -y -qq git yarn bcrypt ruby-full
+
+
+      - checkout
+
+      - restore_cache:
+          key: dependency-cache-yarn-{{ checksum "yarn.lock" }}
+          key: dependency-cache-npm-{{ checksum "yarn.lock" }}
+          key: dependency-cache-rubygem-{{ checksum "Gemfile.lock" }}
+
+      - run:
+          name: Install Dependencies
+          command: |
+            node --version
+            npm install --build-from-source sqlite3
+            yarn install
+            cp .env.sample .env
+
+      - save_cache:
+          key: dependency-cache-yarn-{{ checksum "yarn.lock" }}
+          paths:
+            - ~/.yarn-cache
+
+      - save_cache:
+          key: dependency-cache-npm-{{ checksum "yarn.lock" }}
+          paths:
+            - ./node_modules
+
+      - save_cache:
+          key: dependency-cache-rubygem-{{ checksum "Gemfile.lock" }}
+          paths:
+            - /var/lib/gems
+
+      - run:
+          name: Run Tests
+          command: |
+            sleep 10 && wget --waitretry=5 --retry-connrefused -v http://127.0.0.1:9200/
+            yarn index:migrate
+            TALK_FAMILY_WOO_CONSUMER_KEY='test' TALK_FAMILY_WOO_CONSUMER_SECRET='test' TWILIO_ACCOUNT_SID='test' WOO_CONSUMER_KEY='test' WOO_CONSUMER_SECRET='test' TWILIO_AUTH_TOKEN='test' SIFT_SCIENCE_API_KEY='test' yarn test
+
+      - deploy:
+          command: |
+            /usr/bin/gem install bundler
+            bundle install
+
+            echo "current branch is ${CIRCLE_BRANCH}"
+            echo "current tag is ${CIRCLE_TAG}"
+
+            if [[ -n "${CIRCLE_TAG}" ]]; then
+              CI_BRANCH="${CIRCLE_TAG}" cap production deploy
+            elif [[ "${CIRCLE_BRANCH}" == "master" ]]; then
+              CI_BRANCH=master cap staging deploy
+            fi

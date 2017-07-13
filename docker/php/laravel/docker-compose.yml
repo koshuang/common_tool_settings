@@ -1,0 +1,21 @@
+version: '2'
+services:
+  php7:
+    build: .
+    volumes:
+      - ./:/app
+    ports:
+      - 8000:8000
+      - 3000:3000
+    command:
+      >
+        bash -i -c
+        "
+        cd app;
+        composer install;
+        bower install --allow-root;
+        npm install;
+        gulp;
+        gulp watch;
+        "
+    network_mode: ${DOCKER_NETWORK_MODE}

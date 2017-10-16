@@ -9,7 +9,9 @@
     cob = checkout -b
     s = status --short
     ss  = status
-    br = branch -v
+    br-format = for-each-ref --sort=committerdate --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) - %(authorname) (%(color:green)%(committerdate:relative)%(color:reset))'
+    br = !git br-format refs/heads/
+    brr = !git br-format refs/remotes/origin
 
     l = log --graph --pretty=format:'%Cred%h%Creset %an: %s - %Creset %C(yellow)%d%Creset %Cgreen(%cr)%Creset' --abbrev-commit --date=relative
     # show a pretty log graph
